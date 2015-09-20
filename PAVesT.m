@@ -18,7 +18,7 @@
 % v02 - 17 Nov 2014 - Export changed to give number of particles histogram 
 % and data in .txt fileeven if no PAcenter region is selected.
 
-function PAVesTv02
+function PAVesT
 
 % Close out previous windows so no two are open at same time
 close(findobj('Tag', 'TIFF viewer'));
@@ -1125,30 +1125,34 @@ Startup;
             'String', 'Add Configurations : ', 'BackgroundColor', [.9 .9 .9]);
         
              handles.handles.RunAnalysisText(2) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
-            'Position',[0.4739    0.73    0.2978    0.0375], ...
+            'Position',[0.4739    0.75    0.2978    0.0375], ...
             'String', 'Create GIF : ', 'BackgroundColor', [.9 .9 .9]);
         
             handles.handles.RunAnalysisText(3) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
-            'Position',[0.3000    0.57    0.4756    0.0700], ...
+            'Position',[0.3000    0.6067    0.4756    0.0700], ...
             'String', 'Save Image Series : ', 'BackgroundColor', [.9 .9 .9]);
         
              handles.handles.RunAnalysisText(4) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
-            'Position',[0.2609    0.43    0.5100    0.0700], ...
+            'Position',[0.2609    0.4967    0.5100    0.0700], ...
             'String', 'Save Histogram Data : ', 'BackgroundColor', [.9 .9 .9]);
         
              handles.handles.RunAnalysisText(5) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
+            'Position',[0.1304   0.39    0.6448    0.0700], ...
+            'String', 'Include Randomized Points : ', 'BackgroundColor', [.9 .9 .9]);
+        
+             handles.handles.RunAnalysisText(6) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
             'Position',[0.1370    0.2167    0.2761    0.0933], ...
             'String', 'Histogram Bins (nm) : ', 'BackgroundColor', [.9 .9 .9]);
         
-                     handles.handles.RunAnalysisText(5) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
+                     handles.handles.RunAnalysisText(7) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
             'Position',[0.43    0.29    0.16    0.0700], ...
             'String', 'Start', 'BackgroundColor', [.9 .9 .9]);
         
-                     handles.handles.RunAnalysisText(5) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
+                     handles.handles.RunAnalysisText(8) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
             'Position',[0.63    0.29    0.16    0.0700], ...
             'String', 'Step', 'BackgroundColor', [.9 .9 .9]);
         
-                     handles.handles.RunAnalysisText(5) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
+                     handles.handles.RunAnalysisText(9) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
             'Position',[0.822   0.29    0.16    0.0700], ...
             'String', 'End', 'BackgroundColor', [.9 .9 .9]);
             
@@ -1162,17 +1166,22 @@ Startup;
             'String', '---', 'Callback', @InputPathEdit);
 
             handles.handles.GIFCheck = uicontrol(handles.handles.fig3, 'Style', 'checkbox', 'Units', 'normalized', ...
-            'Position',[0.8587    0.7100    0.0667    0.0625], ...
+            'Position',[0.8587    0.7300    0.0667    0.0625], ...
             'BackgroundColor', [.9 .9 .9], 'Enable', 'on', 'Visible', 'on', ...
             'Value', 1);
 
             handles.handles.ExportImageSeries = uicontrol(handles.handles.fig3, 'Style', 'checkbox', 'Units', 'normalized', ...
-            'Position',[0.8587    0.58    0.0667    0.0625], ...
+            'Position',[0.8587    0.62    0.0667    0.0625], ...
              'BackgroundColor', [.9 .9 .9], 'Enable', 'on', 'Visible', 'on', ...
             'Value', 0);
         
              handles.handles.ExportHistData = uicontrol(handles.handles.fig3, 'Style', 'checkbox', 'Units', 'normalized', ...
-            'Position',[0.8587    0.45    0.0667    0.0625], ...
+            'Position',[0.8587    0.51    0.0667    0.0625], ...
+             'BackgroundColor', [.9 .9 .9], 'Enable', 'on', 'Visible', 'on', ...
+            'Value', 1);
+        
+             handles.handles.IncludeRandPts = uicontrol(handles.handles.fig3, 'Style', 'checkbox', 'Units', 'normalized', ...
+            'Position',[0.8587    0.40    0.0667    0.0625], ...
              'BackgroundColor', [.9 .9 .9], 'Enable', 'on', 'Visible', 'on', ...
             'Value', 1);
         
@@ -1222,6 +1231,8 @@ Startup;
             set(findobj('Parent', handles.handles.fig3, 'type', 'uicontrol'), 'enable', 'off');
             drawnow;
             
+            IncludeRandomPoints = get(handles.handles.IncludeRandPts, 'Value');
+            
             % Actually do the necessary analysis
             
             histcList = str2double(get(handles.handles.HistogramRange(1), 'String')):str2double(get(handles.handles.HistogramRange(2), 'String')):str2double(get(handles.handles.HistogramRange(3), 'String'));
@@ -1230,6 +1241,10 @@ Startup;
             
             histMatrix = zeros(numel(histcList)-1, 2*length(handles.SelectedFiles)+1);
             histMatrix(:,1) = histcList(1:(end-1));
+            
+            if IncludeRandomPoints
+                RandomHistMatrix = histMatrix;
+            end
             
             InOutParticles = cell(length(handles.SelectedFiles), 1);
             InOutCheck = zeros(length(handles.SelectedFiles), 1);
@@ -1457,8 +1472,49 @@ Startup;
                             
                         end
 
-                        
-                        
+%                         if IncludeRandomPositions
+                            %%%%%%%%%%%%
+                            % Include bootstrap analysis for totally scrambled
+                            % position values
+                            % Choose N + M positions inside cell mask img,
+                            % where N + M are equal to number of particles detected in each
+                            % of the two color channels
+
+                            % Doing this on a pixel level first.  Can't see how
+                            % precision higher than that is necessary for this
+                            % analysis.
+                            
+                            % Turns out the values of the non-co-localized
+                            % vesicles don't match to data from an 
+                            % isotropically random distribution of vesicles.
+                            % This section of the code commented and a
+                            % separate analysis removing temporal
+                            % information from the analysis shown below.
+                            
+%                             bootList_GR = [];
+%                             bootList_RG = [];
+%                             
+%                             for nBs = 1:NBootstraps
+%                                 [pixY, pixX] = find(bwImg); % List of possible pixels
+%                                 randValsG = randi([1 numel(pixX)], [sum(postListG(:,3) == k), 1]);
+%                                 randValsR = randi([1 numel(pixX)], [sum(postListR(:,3) == k), 1]);
+% 
+%                                 rpG = [pixX(randValsG), pixY(randValsG)];
+%                                 rpR = [pixX(randValsR), pixY(randValsR)];
+%                                 
+%                                 [~, kB_GR] = knnsearch(rpG, rpR);
+%                                 [~, kB_RG] = knnsearch(rpR, rpG);
+%                                 
+%                                 bootList_GR = [bootList_GR; kB_GR];
+%                                 bootList_RG = [bootList_RG; kB_RG];
+%                             end
+% 
+%                             %%%%%%%%%
+%                             bootList_GR = bootList_GR * AnalParam.PixelSize * 1000;
+%                             bootList_RG = bootList_RG * AnalParam.PixelSize * 1000;
+                            
+%                         end
+
 
                         if MakeGif || ExportSeries
                             C = imfuse(dataHereG, dataHereR,'falsecolor','Scaling','independent','ColorChannels','red-cyan');
@@ -1537,7 +1593,7 @@ Startup;
                             [~, dR] = knnsearch(postListR(postListR(:,3)==k, 1:2), postListG(postListG(:,3)==k, 1:2));
                             NNdistR = [NNdistR; dR];
                         end
-                        
+                                                
                         
                         if isempty(postListG)
                             postListG = zeros(1, 4);
@@ -1557,15 +1613,62 @@ Startup;
                         close(gifWindow);
                     end
             
+                    if IncludeRandomPoints
+                        % Shuffle which peaks go in each frame in
+                        % postListG and postListR.  This represents
+                        % spatially-consistient but
+                        % temporally-scrambled data to give measure of
+                        % nearest-neighbor distances for totally
+                        % non-co-localized vesicles.
+                        
+                        bootList_GR = [];
+                        bootList_RG = [];
+                        
+                        shuffleLines.G = randperm(size(postListG, 1));
+                        shuffleLines.R = randperm(size(postListR, 1));
+                        
+                        shuffG = [postListG(shuffleLines.G, 1:2) postListG(:,3:4)];
+                        shuffR = [postListR(shuffleLines.R, 1:2) postListR(:,3:4)];
+                        
+                        for k = 1:(handles.N_frames-1)
+                            
+                            [~, dG] = knnsearch(shuffG(shuffG(:,3)==k, 1:2), shuffR(shuffR(:,3)==k, 1:2));
+                            [~, dR] = knnsearch(shuffR(shuffR(:,3)==k, 1:2), shuffG(shuffG(:,3)==k, 1:2));
+                            
+                            
+                            if ~isempty(dG) && ~isempty(dR)
+                                bootList_GR = [bootList_GR; dG];
+                                bootList_RG = [bootList_RG; dR];
+                            end
+                            
+                        end
+                        
+                        bootList_GR = bootList_GR * AnalParam.PixelSize * 1000;
+                        bootList_RG = bootList_RG * AnalParam.PixelSize * 1000;
+                        
+                        [aB1, ~] = histc(bootList_GR, histcList);
+                        [aB2, ~] = histc(bootList_RG, histcList);
+                        
+                        aB1(end) = [];
+                        aB2(end) = [];
+                        
+                        RandomHistMatrix(:,(2*fN)) = aB1(:)/sum(aB1(:));
+                        RandomHistMatrix(:,(2*fN)+1) = aB2(:)/sum(aB2(:));
+                        
+                    end
+                    
             
                 % trackResG = track(postListG, 10);
                 % trackResR = track(postListR, 10);
                 NNdistG = NNdistG * AnalParam.PixelSize * 1000;
                 NNdistR = NNdistR * AnalParam.PixelSize * 1000;
 
-                [a1, b1] = histc(NNdistG, histcList);
-                [a2, b2] = histc(NNdistR, histcList);
+                [a1, ~] = histc(NNdistG, histcList);
+                [a2, ~] = histc(NNdistR, histcList);
 
+                % Calc theoretical distribution for cell of size and
+                % particle density as the cells in this run.  
+               
                 
                 a1(end) = [];
                 a2(end) = [];
@@ -1576,7 +1679,7 @@ Startup;
 %                 assignin('base', 'histMatrix', histMatrix);
 
                 if get(handles.handles.ExportHistData, 'Value') == 1
-
+                    
                     plot(histAx, histcList(1:(end-1)), a1/sum(a1(:)), 'LineStyle', '-', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
                     if fN == 1
                         set(histAx, 'NextPlot', 'add')
@@ -1587,13 +1690,22 @@ Startup;
                     ylabel(histAx, 'PDF', 'FontSize', 12)
                     set(histogramFigure, 'Position', [100 100 800 600])
                     set(histAx, 'LooseInset', get(histAx, 'TightInset'));
-
-                    if fN == length(handles.SelectedFiles)
-                        set(histAx, 'NextPlot', 'replace')
+                    
+                    if IncludeRandomPoints
+                        plot(histAx, histcList(1:(end-1)), aB1(:)/sum(aB1(:)), 'LineStyle', ':', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
+                        plot(histAx, histcList(1:(end-1)), aB2(:)/sum(aB2(:)), 'LineStyle', '-.', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
+                        
+                        legendString{4*(fN-1)+1} = strcat(fileName, ' 2 -> 1');
+                        legendString{4*(fN-1)+2} = strcat(fileName, ' 1 -> 2');
+                        legendString{4*(fN-1)+3} = strcat(fileName, ' RAND 2 -> 1');
+                        legendString{4*(fN-1)+4} = strcat(fileName, ' RAND 1 -> 2');
+                        
+                    else
+                        legendString{2*(fN-1)+1} = strcat(fileName, ' 2 -> 1');
+                        legendString{2*(fN-1)+2} = strcat(fileName, ' 1 -> 2');
                     end
                     
-                    legendString{2*(fN-1)+1} = strcat(fileName, ' 2 -> 1');
-                    legendString{2*(fN-1)+2} = strcat(fileName, ' 1 -> 2');
+                    
 
                     if fN == length(handles.SelectedFiles)
                         set(histAx, 'NextPlot', 'replace')
@@ -1755,6 +1867,35 @@ Startup;
                         
                     end
                     fclose(fID);
+                    
+                    
+                    if IncludeRandomPoints
+                        %%%%%%%%%%%%%%%%%
+                        % Include random data
+                        %%%%%%%%%%%%%%%
+                        % Print histogram data file
+
+                        HistFileName = fullfile(folderPath, strcat(hImg, '_RandomPoints.txt'));
+
+                        fID = fopen(HistFileName, 'w+');
+                        fprintf(fID, '#####################\r\n');
+                        fprintf(fID, '# Files analyzed : \r\n');
+
+                        headerString = 'Distance (nm)';
+
+                        for fNms = 1:length(handles.SelectedFiles);
+                            fprintf(fID, '# %.0f.  %s \r\n', fNms, fileNameArray{fNms});
+                            headerString = sprintf('%s\t%.0f--Ch1\t%.0f--Ch2', headerString, fNms, fNms);
+                        end
+                        fprintf(fID, '#####################\r\n');
+                        fprintf(fID, '%s\r\n', headerString);
+
+                        fclose(fID);
+                        dlmwrite(HistFileName, RandomHistMatrix, '-append', 'delimiter', '\t', 'newline', 'pc');
+                    end
+                
+                
+                    
                     
                     print(InOutFigure, '-dpng', strcat(hImg, '_InOutImg', '.png'));
 
