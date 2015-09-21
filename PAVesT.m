@@ -1232,6 +1232,10 @@ Startup;
             drawnow;
             
             IncludeRandomPoints = get(handles.handles.IncludeRandPts, 'Value');
+            if length(handles.SelectedFiles) > size(handles.ColorList, 1)/2
+                handles.ColorList = jet(length(handles.SelectedFiles)*2);
+                handles.ColorList = handles.ColorList(randperm(size(handles.ColorList, 1)), :);
+            end
             
             % Actually do the necessary analysis
             
@@ -1649,8 +1653,18 @@ Startup;
                         [aB1, ~] = histc(bootList_GR, histcList);
                         [aB2, ~] = histc(bootList_RG, histcList);
                         
-                        aB1(end) = [];
-                        aB2(end) = [];
+                        if ~isempty(aB1)
+                            aB1(end) = [];
+                            
+                        else
+                            aB1 = nan(numel(histcList)-1, 1);
+                        end
+                        
+                        if ~isempty(aB2)
+                            aB2(end) = [];
+                        else
+                            aB2 = nan(numel(histcList)-1, 1);
+                        end
                         
                         RandomHistMatrix(:,(2*fN)) = aB1(:)/sum(aB1(:));
                         RandomHistMatrix(:,(2*fN)+1) = aB2(:)/sum(aB2(:));
@@ -1669,10 +1683,18 @@ Startup;
                 % Calc theoretical distribution for cell of size and
                 % particle density as the cells in this run.  
                
+                if ~isempty(a1)
+                    a1(end) = [];
+                else
+                    a1 = nan(numel(histcList)-1, 1);
+                end
                 
-                a1(end) = [];
-                a2(end) = [];
-
+                if ~isempty(a2)
+                    a2(end) = [];
+                else
+                    a2 = nan(numel(histcList)-1, 1);
+                end
+                
                 histMatrix(:,(2*fN)) = a1(:)/sum(a1(:));
                 histMatrix(:,(2*fN)+1) = a2(:)/sum(a2(:));
                 
@@ -1691,7 +1713,7 @@ Startup;
                     set(histogramFigure, 'Position', [100 100 800 600])
                     set(histAx, 'LooseInset', get(histAx, 'TightInset'));
                     
-                    if IncludeRandomPoints
+                    if IncludeRandomPoints && ~(isempty(aB1) && isempty(aB2))
                         plot(histAx, histcList(1:(end-1)), aB1(:)/sum(aB1(:)), 'LineStyle', ':', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
                         plot(histAx, histcList(1:(end-1)), aB2(:)/sum(aB2(:)), 'LineStyle', '-.', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
                         
@@ -1718,8 +1740,8 @@ Startup;
                             set(InOutAxes, 'NextPlot', 'add')
                         end
                         plot(InOutAxes, InOutParticles{fN}(:,1), InOutParticles{fN}(:,3), 'LineStyle', '--', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
-                        plot(InOutAxes, InOutParticles{fN}(:,1), InOutParticles{fN}(:,4), 'LineStyle', '-', 'Color', handles.ColorList(fN+10,:), 'LineWidth', 2);
-                        plot(InOutAxes, InOutParticles{fN}(:,1), InOutParticles{fN}(:,5), 'LineStyle', '--', 'Color', handles.ColorList(fN+10,:), 'LineWidth', 2);
+                        plot(InOutAxes, InOutParticles{fN}(:,1), InOutParticles{fN}(:,4), 'LineStyle', '-', 'Color', handles.ColorList(fN+size(handles.ColorList, 1)/2,:), 'LineWidth', 2);
+                        plot(InOutAxes, InOutParticles{fN}(:,1), InOutParticles{fN}(:,5), 'LineStyle', '--', 'Color', handles.ColorList(fN+size(handles.ColorList, 1)/2,:), 'LineWidth', 2);
 
 
                         
@@ -1747,7 +1769,7 @@ Startup;
                             set(InOutAxes, 'NextPlot', 'add')
                         end
 %                         plot(InOutAxes, InOutParticles{fN}(:,1), InOutParticles{fN}(:,3), 'LineStyle', '--', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
-                        plot(InOutAxes, InOutParticles{fN}(:,1), InOutParticles{fN}(:,4), 'LineStyle', '-', 'Color', handles.ColorList(fN+10,:), 'LineWidth', 2);
+                        plot(InOutAxes, InOutParticles{fN}(:,1), InOutParticles{fN}(:,4), 'LineStyle', '-', 'Color', handles.ColorList(fN+size(handles.ColorList, 1)/2,:), 'LineWidth', 2);
 %                         plot(InOutAxes, InOutParticles{fN}(:,1), InOutParticles{fN}(:,5), 'LineStyle', '--', 'Color', handles.ColorList(fN+10,:), 'LineWidth', 2);
 
 
