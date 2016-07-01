@@ -447,24 +447,28 @@ Startup;
         
         
         handles.handles.fndCtr_slider_text(2) = uicontrol(slider_panel, 'Style', 'text', 'Units', 'normalized',...
-            'String', 'Channel :', 'Position', [.01 .25 .3 .05], 'BackgroundColor', [.9 .9 .9], ...
+            'String', 'Channel :', 'Position', [.01 .25 .4 .05], 'BackgroundColor', [.9 .9 .9], ...
             'HorizontalAlignment', 'left');
         
         handles.handles.fndCtrChannel = uibuttongroup('Parent',slider_panel,...
             'BorderType', 'none', ...
-            'Position',[.081 .23 .15 .1], 'BackgroundColor', [.9 .9 .9], 'SelectionChangeFcn', @fndCtrChannel_group_change);
+            'Position',[.078 .23 .155 .1], 'BackgroundColor', [.9 .9 .9], 'SelectionChangeFcn', @fndCtrChannel_group_change);
         
         handles.handles.fndCtrChanButton(1) = uicontrol(handles.handles.fndCtrChannel,'Style','toggle','String','1',...
                 'Units','normalized', 'HandleVisibility', 'off', 'Tag', 'ctrChanBtn1', ...
-                'Position',[0 0 .3 .9]);
+                'Position',[0 0 .25 .9]);
             
         handles.handles.fndCtrChanButton(2) = uicontrol(handles.handles.fndCtrChannel,'Style','toggle','String','2',...
                 'Units','normalized','HandleVisibility', 'off', 'Tag', 'ctrChanBtn2',...
-                'Position',[.33 0 .3 .9]);
+                'Position',[.25 0 .25 .9]);
             
         handles.handles.fndCtrChanButton(3) = uicontrol(handles.handles.fndCtrChannel,'Style','toggle','String','X',...
                 'Units','normalized','HandleVisibility', 'off', 'Tag', 'ctrChanBtn3',...
-                'Position',[.67 0 .3 .9]);
+                'Position',[.5 0 .25 .9]);
+            
+        handles.handles.fndCtrChanButton(4) = uicontrol(handles.handles.fndCtrChannel,'Style','toggle','String','U',...
+                'Units','normalized','HandleVisibility', 'off', 'Tag', 'ctrChanBtn4',...
+                'Position',[.75 0 .25 .9]);
             
         set(handles.handles.fndCtrChannel,'SelectedObject', handles.handles.fndCtrChanButton(handles.CenterChannel));
             
@@ -831,6 +835,7 @@ Startup;
                 set(handles.handles.fndCtr_slide_box, 'Enable', 'on')
                 set(handles.handles.fndCtr_Erode_box, 'Enable', 'on')
                 handles.CenterChannel = 1;
+                handles.UserDefinedCenterROIs = {};
                 
             case '2' 
                 
@@ -839,6 +844,7 @@ Startup;
                 set(handles.handles.fndCtr_slide_box, 'Enable', 'on')
                 set(handles.handles.fndCtr_Erode_box, 'Enable', 'on')
                 handles.CenterChannel = 2;
+                handles.UserDefinedCenterROIs = {};
                 
             case 'X' 
                 
@@ -850,11 +856,32 @@ Startup;
                 
                 delete(findobj('Parent', handles.handles.ax1, 'Type', 'line', 'Color', 'm'));
                 delete(findobj('Parent', handles.handles.ax2, 'Type', 'line', 'Color', 'm'));
+                handles.UserDefinedCenterROIs = {};
+                
+            case 'U' 
+                
+                % User-defined center position
+                % Need a roiPoly object for each frame
+
+                set(handles.handles.fndCtr_slide_hand, 'Enable', 'off')
+                set(handles.handles.fndCtr_slide_box, 'Enable', 'off')
+                set(handles.handles.fndCtr_Erode_box, 'Enable', 'off')
+                handles.CenterChannel = 4;
+                
+                delete(findobj('Parent', handles.handles.ax1, 'Type', 'line', 'Color', 'm'));
+                delete(findobj('Parent', handles.handles.ax2, 'Type', 'line', 'Color', 'm'));
+                
+                guidata(findobj('Tag', 'TIFF viewer'), handles);
+                
+                setUpUserDefinedCenterROIs();
+                
                 
         end
         guidata(findobj('Tag', 'TIFF viewer'), handles);
         
         if handles.CenterChannel ~= 3
+            
+            delete(findobj('parent', handles.handles.ax1, 'tag', 'impoly'));
         
             displayCenterThreshold
             
@@ -974,7 +1001,7 @@ Startup;
            firstLine = textscan(fID, '%s %s', 1, 'Delimiter', '\t');
            handles.Load_file = firstLine{2}{1};
            
-           restoffile = textscan(fID, '%s %f %f', 'Delimiter', '\t');
+           restoffile = textscan(fID, '%s %f %f', 11, 'Delimiter', '\t');
            handles.ParticleIntensityThresholds(1) = restoffile{2}(1);
            handles.ParticleIntensityThresholds(2) = restoffile{3}(1);
            handles.peakfindRadius = restoffile{2}(2);
@@ -988,6 +1015,37 @@ Startup;
            handles.CenterIntensity = restoffile{2}(9);
            handles.FindCtrDilateDiameter = restoffile{2}(10);
            handles.PixelSize = restoffile{2}(11);
+           
+           fgetl(fID); % skip a line
+           
+           if handles.CenterChannel == 4
+               % read in rest of file for ROIs
+               endOfFile = 0;
+               
+               k = 1;
+               
+               while endOfFile == 0
+                   nextLineX = fgetl(fID);
+                   nextLineY = fgetl(fID);
+                   
+                   if nextLineX ~= -1
+                       nextLineX = strsplit(nextLineX, '\t');
+                       nextLineY = strsplit(nextLineY, '\t');
+                       
+                       for m = 2:size(nextLineX, 2)
+                           nextLineX{m} = str2double(nextLineX{m});
+                           nextLineY{m} = str2double(nextLineY{m});
+                       end
+                       
+                       handles.UserDefinedCenterROIs{k, 1}(:,1) = cell2mat(nextLineX(2:end)');
+                       handles.UserDefinedCenterROIs{k, 1}(:,2) = cell2mat(nextLineY(2:end)');
+                       k = k+1;
+                   else
+                       endOfFile = 1;
+                   end
+               end
+               
+           end
 
            fclose(fID);
            
@@ -1087,6 +1145,16 @@ Startup;
            fprintf(fID, 'Center Threshold Dilate Diameter : \t%.0f\n', handles.FindCtrDilateDiameter);
            fprintf(fID, 'Pixel Size : \t%.8f\n', handles.PixelSize);
            
+           % Long part to save all of the center polygons
+           if handles.CenterChannel == 4
+              for k = 1:handles.N_frames
+                  roiString = repmat('\t%.1f', 1, size(handles.UserDefinedCenterROIs{k}, 1));
+                  roiString = strcat('ROI_%d,%s', roiString, '\n');
+                  fprintf(fID, roiString, k, 'x',  handles.UserDefinedCenterROIs{k}(:,1));
+                  fprintf(fID, roiString, k, 'y',  handles.UserDefinedCenterROIs{k}(:,2));
+              end
+           end
+           
            fclose(fID);
         end
         
@@ -1125,36 +1193,42 @@ Startup;
             'String', 'Add Configurations : ', 'BackgroundColor', [.9 .9 .9]);
         
              handles.handles.RunAnalysisText(2) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
-            'Position',[0.4739    0.75    0.2978    0.0375], ...
+            'Position',[0.4739    0.75    0.2978    0.06], ...
             'String', 'Create GIF : ', 'BackgroundColor', [.9 .9 .9]);
         
             handles.handles.RunAnalysisText(3) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
-            'Position',[0.3000    0.6067    0.4756    0.0700], ...
+            'Position',[0.3000    0.66    0.4756    0.06], ...
             'String', 'Save Image Series : ', 'BackgroundColor', [.9 .9 .9]);
         
              handles.handles.RunAnalysisText(4) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
-            'Position',[0.2609    0.4967    0.5100    0.0700], ...
+            'Position',[0.2609    0.57   0.5100    0.06], ...
             'String', 'Save Histogram Data : ', 'BackgroundColor', [.9 .9 .9]);
         
+            handles.handles.RunAnalysisText(10) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
+            'Position',[0.1504   0.48   0.6448    0.06], ...
+            'String', 'Split Center from Interior :', 'BackgroundColor', [.9 .9 .9]);
+        
              handles.handles.RunAnalysisText(5) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
-            'Position',[0.1304   0.39    0.6448    0.0700], ...
+            'Position',[0.1304   0.39    0.6448    0.06], ...
             'String', 'Include Randomized Points : ', 'BackgroundColor', [.9 .9 .9]);
         
              handles.handles.RunAnalysisText(6) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
             'Position',[0.1370    0.2167    0.2761    0.0933], ...
             'String', 'Histogram Bins (nm) : ', 'BackgroundColor', [.9 .9 .9]);
         
-                     handles.handles.RunAnalysisText(7) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
+             handles.handles.RunAnalysisText(7) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
             'Position',[0.43    0.29    0.16    0.0700], ...
             'String', 'Start', 'BackgroundColor', [.9 .9 .9]);
         
-                     handles.handles.RunAnalysisText(8) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
+             handles.handles.RunAnalysisText(8) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
             'Position',[0.63    0.29    0.16    0.0700], ...
             'String', 'Step', 'BackgroundColor', [.9 .9 .9]);
         
-                     handles.handles.RunAnalysisText(9) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
+             handles.handles.RunAnalysisText(9) = uicontrol(handles.handles.fig3, 'Style', 'text', 'Units', 'normalized', ...
             'Position',[0.822   0.29    0.16    0.0700], ...
             'String', 'End', 'BackgroundColor', [.9 .9 .9]);
+        
+
             
             handles.handles.InputPathButton = uicontrol('Style', 'pushbutton', 'Units', 'normalized', ...
             'Position', [0.8043    0.8333    0.1739    0.0842], 'Parent', handles.handles.fig3,...
@@ -1166,22 +1240,27 @@ Startup;
             'String', '---', 'Callback', @InputPathEdit);
 
             handles.handles.GIFCheck = uicontrol(handles.handles.fig3, 'Style', 'checkbox', 'Units', 'normalized', ...
-            'Position',[0.8587    0.7300    0.0667    0.0625], ...
+            'Position',[0.8587    0.7500    0.0667    0.0625], ...
             'BackgroundColor', [.9 .9 .9], 'Enable', 'on', 'Visible', 'on', ...
             'Value', 1);
 
             handles.handles.ExportImageSeries = uicontrol(handles.handles.fig3, 'Style', 'checkbox', 'Units', 'normalized', ...
-            'Position',[0.8587    0.62    0.0667    0.0625], ...
+            'Position',[0.8587    0.66    0.0667    0.0625], ...
              'BackgroundColor', [.9 .9 .9], 'Enable', 'on', 'Visible', 'on', ...
             'Value', 0);
         
              handles.handles.ExportHistData = uicontrol(handles.handles.fig3, 'Style', 'checkbox', 'Units', 'normalized', ...
-            'Position',[0.8587    0.51    0.0667    0.0625], ...
+            'Position',[0.8587    0.57    0.0667    0.0625], ...
+             'BackgroundColor', [.9 .9 .9], 'Enable', 'on', 'Visible', 'on', ...
+            'Value', 1);
+        
+            handles.handles.SplitCenter = uicontrol(handles.handles.fig3, 'Style', 'checkbox', 'Units', 'normalized', ...
+            'Position',[0.8587    0.48    0.0667    0.0625], ...
              'BackgroundColor', [.9 .9 .9], 'Enable', 'on', 'Visible', 'on', ...
             'Value', 1);
         
              handles.handles.IncludeRandPts = uicontrol(handles.handles.fig3, 'Style', 'checkbox', 'Units', 'normalized', ...
-            'Position',[0.8587    0.40    0.0667    0.0625], ...
+            'Position',[0.8587    0.39    0.0667    0.0625], ...
              'BackgroundColor', [.9 .9 .9], 'Enable', 'on', 'Visible', 'on', ...
             'Value', 1);
         
@@ -1246,8 +1325,17 @@ Startup;
             histMatrix = zeros(numel(histcList)-1, 2*length(handles.SelectedFiles)+1);
             histMatrix(:,1) = histcList(1:(end-1));
             
+            if handles.handles.SplitCenter.Value()
+                histMatrixSplit = zeros(numel(histcList)-1, 4*length(handles.SelectedFiles)+1);
+            end
+
             if IncludeRandomPoints
                 RandomHistMatrix = histMatrix;
+                
+                if handles.handles.SplitCenter.Value()
+                    RandomHistMatrixSplit = zeros(numel(histcList)-1, 4*length(handles.SelectedFiles)+1);
+                end
+                
             end
             
             InOutParticles = cell(length(handles.SelectedFiles), 1);
@@ -1279,7 +1367,7 @@ Startup;
                firstLine = textscan(fID, '%s %s', 1, 'Delimiter', '\t');
                AnalParam.Load_file = firstLine{2}{1};
 
-               restoffile = textscan(fID, '%s %f %f', 'Delimiter', '\t');
+               restoffile = textscan(fID, '%s %f %f', 11, 'Delimiter', '\t');
                AnalParam.ParticleIntensityThresholds(1) = restoffile{2}(1);
                AnalParam.ParticleIntensityThresholds(2) = restoffile{3}(1);
                AnalParam.peakfindRadius = restoffile{2}(2);
@@ -1294,7 +1382,40 @@ Startup;
                AnalParam.FindCtrDilateDiameter = restoffile{2}(10);
                AnalParam.PixelSize = restoffile{2}(11);
 
+               
+               fgetl(fID); % skip a line
+               
+               if AnalParam.CenterChannel == 4
+                   % read in rest of file for ROIs
+                   endOfFile = 0;
+                   
+                   k = 1;
+                   
+                   while endOfFile == 0
+                       nextLineX = fgetl(fID);
+                       nextLineY = fgetl(fID);
+                       
+                       if nextLineX ~= -1
+                           nextLineX = strsplit(nextLineX, '\t');
+                           nextLineY = strsplit(nextLineY, '\t');
+                           
+                           for m = 2:size(nextLineX, 2)
+                               nextLineX{m} = str2double(nextLineX{m});
+                               nextLineY{m} = str2double(nextLineY{m});
+                           end
+                           
+                           AnalParam.UserDefinedCenterROIs{k, 1}(:,1) = cell2mat(nextLineX(2:end)');
+                           AnalParam.UserDefinedCenterROIs{k, 1}(:,2) = cell2mat(nextLineY(2:end)');
+                           k = k+1;
+                       else
+                           endOfFile = 1;
+                       end
+                   end
+                   
+               end
+
                fclose(fID);
+               
                
                if ~strcmp(AnalParam.Load_file, oldName);
                    
@@ -1345,6 +1466,17 @@ Startup;
 
                 NNdistG = [];
                 NNdistR = [];
+                
+                NNdistGOut = [];
+                NNdistGIn = [];
+                
+                NNdistROut = [];
+                NNdistRIn = [];
+                
+                bootList_GRIn = [];
+                bootList_RGIn = [];
+                bootList_GROut = [];
+                bootList_RGOut = [];
                 
                 InOutParticles{fN} = zeros((handles.N_frames-1), 5);
                 
@@ -1425,27 +1557,37 @@ Startup;
                         %%%%%%%%%%%%%
                         % Add in bits for center vs outside segmentation
                         if AnalParam.CenterChannel ~= 3
-                            ctrVal = AnalParam.CenterIntensity;
-                            dilatePixels = AnalParam.FindCtrDilateDiameter;
-
+                            
                             borderImg = bwImg;
                             
-                            if AnalParam.CenterChannel == 1
-                                gC = (dataHereG > (AnalParam.CenterIntensity));
-                            elseif AnalParam.CenterChannel == 2
-                                gC = (dataHereR > (AnalParam.CenterIntensity));
+                            if ismember(AnalParam.CenterChannel, [1, 2]);
+                                ctrVal = AnalParam.CenterIntensity;
+                                dilatePixels = AnalParam.FindCtrDilateDiameter;
+
+                                if AnalParam.CenterChannel == 1
+                                    gC = (dataHereG > (AnalParam.CenterIntensity));
+                                elseif AnalParam.CenterChannel == 2
+                                    gC = (dataHereR > (AnalParam.CenterIntensity));
+                                end
+                                regs = regionprops(gC, 'area', 'PixelIdxList');
+                                rA = vertcat(regs.Area);
+                                regs(rA ~= max(rA)) = [];
+                                ctrImg = false(size(borderImg, 1)*size(borderImg, 2), 1);
+                                ctrImg(vertcat(regs.PixelIdxList)) = 1;
+                                ctrImg = reshape(ctrImg, size(borderImg, 1), size(borderImg, 2));
+                                ctrImg = bwmorph(ctrImg, 'dilate', dilatePixels);
+
+                            elseif AnalParam.CenterChannel == 4
+                                
+                                borderImg = bwImg;
+                                
+                                ctrImg = poly2mask(AnalParam.UserDefinedCenterROIs{k}(:,1), ...
+                                    AnalParam.UserDefinedCenterROIs{k}(:,2), size(dataGreen, 1), ...
+                                    size(dataGreen, 2));
                             end
-                            regs = regionprops(gC, 'area', 'PixelIdxList');
-                            rA = vertcat(regs.Area);
-                            regs(rA ~= max(rA)) = [];
-                            ctrImg = false(size(borderImg, 1)*size(borderImg, 2), 1);
-                            ctrImg(vertcat(regs.PixelIdxList)) = 1;
-                            ctrImg = reshape(ctrImg, size(borderImg, 1), size(borderImg, 2));
 
                             cBo = bwboundaries(ctrImg, 'noholes');
-                            
-                            ctrImg = bwmorph(ctrImg, 'dilate', dilatePixels);
-                            
+
                             ctrMask = borderImg;
                             ctrMask(ctrImg) = 0;
 
@@ -1476,49 +1618,6 @@ Startup;
                             
                         end
 
-%                         if IncludeRandomPositions
-                            %%%%%%%%%%%%
-                            % Include bootstrap analysis for totally scrambled
-                            % position values
-                            % Choose N + M positions inside cell mask img,
-                            % where N + M are equal to number of particles detected in each
-                            % of the two color channels
-
-                            % Doing this on a pixel level first.  Can't see how
-                            % precision higher than that is necessary for this
-                            % analysis.
-                            
-                            % Turns out the values of the non-co-localized
-                            % vesicles don't match to data from an 
-                            % isotropically random distribution of vesicles.
-                            % This section of the code commented and a
-                            % separate analysis removing temporal
-                            % information from the analysis shown below.
-                            
-%                             bootList_GR = [];
-%                             bootList_RG = [];
-%                             
-%                             for nBs = 1:NBootstraps
-%                                 [pixY, pixX] = find(bwImg); % List of possible pixels
-%                                 randValsG = randi([1 numel(pixX)], [sum(postListG(:,3) == k), 1]);
-%                                 randValsR = randi([1 numel(pixX)], [sum(postListR(:,3) == k), 1]);
-% 
-%                                 rpG = [pixX(randValsG), pixY(randValsG)];
-%                                 rpR = [pixX(randValsR), pixY(randValsR)];
-%                                 
-%                                 [~, kB_GR] = knnsearch(rpG, rpR);
-%                                 [~, kB_RG] = knnsearch(rpR, rpG);
-%                                 
-%                                 bootList_GR = [bootList_GR; kB_GR];
-%                                 bootList_RG = [bootList_RG; kB_RG];
-%                             end
-% 
-%                             %%%%%%%%%
-%                             bootList_GR = bootList_GR * AnalParam.PixelSize * 1000;
-%                             bootList_RG = bootList_RG * AnalParam.PixelSize * 1000;
-                            
-%                         end
-
 
                         if MakeGif || ExportSeries
                             C = imfuse(dataHereG, dataHereR,'falsecolor','Scaling','independent','ColorChannels','red-cyan');
@@ -1528,13 +1627,17 @@ Startup;
                             
                             if ~isempty(postListG) 
                                 
-                                plot(gifAxes, postListG((postListG(:,3)==k & postListG(:,4) == 1), 1), postListG((postListG(:,3)==k & postListG(:,4) == 1), 2), 'cx')
-                                plot(gifAxes, postListG((postListG(:,3)==k & postListG(:,4) == 0), 1), postListG((postListG(:,3)==k & postListG(:,4) == 0), 2), 'cs', 'markerfacecolor', 'c', 'MarkerSize', 3)
+                                plot(gifAxes, postListG((postListG(:,3)==k & postListG(:,4) == 1), 1), ...
+                                    postListG((postListG(:,3)==k & postListG(:,4) == 1), 2), 'cx')
+                                plot(gifAxes, postListG((postListG(:,3)==k & postListG(:,4) == 0), 1), ...
+                                    postListG((postListG(:,3)==k & postListG(:,4) == 0), 2), 'cs', 'markerfacecolor', 'c', 'MarkerSize', 3)
                             end
                             
                             if ~isempty(postListR)
-                                plot(gifAxes, postListR((postListR(:,3)==k & postListR(:,4) == 1), 1), postListR((postListR(:,3)==k & postListR(:,4) == 1), 2), 'rx')
-                                plot(gifAxes, postListR((postListR(:,3)==k & postListR(:,4) == 0), 1), postListR((postListR(:,3)==k & postListR(:,4) == 0), 2), 'rs', 'markerfacecolor', 'r', 'MarkerSize', 3)
+                                plot(gifAxes, postListR((postListR(:,3)==k & postListR(:,4) == 1), 1), ...
+                                    postListR((postListR(:,3)==k & postListR(:,4) == 1), 2), 'rx')
+                                plot(gifAxes, postListR((postListR(:,3)==k & postListR(:,4) == 0), 1), ...
+                                    postListR((postListR(:,3)==k & postListR(:,4) == 0), 2), 'rs', 'markerfacecolor', 'r', 'MarkerSize', 3)
                             end
 
                             for m = 1:length(B)
@@ -1596,6 +1699,29 @@ Startup;
 
                             [~, dR] = knnsearch(postListR(postListR(:,3)==k, 1:2), postListG(postListG(:,3)==k, 1:2));
                             NNdistR = [NNdistR; dR];
+                            
+                           
+                            if handles.handles.SplitCenter.Value()
+                                % Calc NNdistG and NNdistR for inner and
+                                % outer regions
+                                [~, dG] = knnsearch(postListG(postListG(:,3)==k & postListG(:,4) == 0, 1:2), ...
+                                    postListR(postListR(:,3)==k & postListR(:,4) == 0, 1:2));
+                                NNdistGOut = [NNdistGOut; dG];
+                                
+                                [~, dG] = knnsearch(postListG(postListG(:,3)==k & postListG(:,4) == 1, 1:2), ...
+                                    postListR(postListR(:,3)==k & postListR(:,4) == 1, 1:2));
+                                NNdistGIn = [NNdistGIn; dG];
+                                
+                                [~, dR] = knnsearch(postListR(postListR(:,3)==k & postListR(:,4) == 1, 1:2), ...
+                                    postListG(postListG(:,3)==k & postListG(:,4) == 1, 1:2));
+                                NNdistRIn = [NNdistRIn; dR];
+                            
+                                [~, dR] = knnsearch(postListR(postListR(:,3)==k & postListR(:,4) == 0, 1:2), ...
+                                    postListG(postListG(:,3)==k & postListG(:,4) == 0, 1:2));
+                                NNdistROut = [NNdistROut; dR];
+                                
+                            end
+                            
                         end
                                                 
                         
@@ -1612,6 +1738,79 @@ Startup;
                             numel(postListR((postListR(:,3)==k & postListR(:,4) == 0)))];
 
                     end
+                   
+                    %%%%%%%%%%
+                    % Make histograms from data
+                    
+                   % trackResG = track(postListG, 10);
+                    % trackResR = track(postListR, 10);
+                    NNdistG = NNdistG * AnalParam.PixelSize * 1000;
+                    NNdistR = NNdistR * AnalParam.PixelSize * 1000;
+
+                    [a1, ~] = histc(NNdistG, histcList);
+                    [a2, ~] = histc(NNdistR, histcList);
+
+                    % Calc theoretical distribution for cell of size and
+                    % particle density as the cells in this run.  
+
+                    if ~isempty(a1)
+                        a1(end) = [];
+                    else
+                        a1 = nan(numel(histcList)-1, 1);
+                    end
+
+                    if ~isempty(a2)
+                        a2(end) = [];
+                    else
+                        a2 = nan(numel(histcList)-1, 1);
+                    end
+
+                    histMatrix(:,(2*fN)) = a1(:)/sum(a1(:));
+                    histMatrix(:,(2*fN)+1) = a2(:)/sum(a2(:));
+                    
+                    if handles.handles.SplitCenter.Value()
+                        
+                        NNdistGOut = NNdistGOut * AnalParam.PixelSize * 1000;
+                        NNdistGIn = NNdistGIn * AnalParam.PixelSize * 1000;
+                        NNdistRIn = NNdistRIn * AnalParam.PixelSize * 1000;
+                        NNdistROut = NNdistROut * AnalParam.PixelSize * 1000;
+
+                        [a1p, ~] = histc(NNdistGOut, histcList);
+                        [a2p, ~] = histc(NNdistGIn, histcList);
+                        [a3p, ~] = histc(NNdistRIn, histcList);
+                        [a4p, ~] = histc(NNdistROut, histcList);
+
+                        if ~isempty(a1p)
+                            a1p(end) = [];
+                        else
+                            a1p = nan(numel(histcList)-1, 1);
+                        end
+
+                        if ~isempty(a2p)
+                            a2p(end) = [];
+                        else
+                            a2p = nan(numel(histcList)-1, 1);
+                        end
+                        
+                        if ~isempty(a3p)
+                            a3p(end) = [];
+                        else
+                            a3p = nan(numel(histcList)-1, 1);
+                        end
+                        
+                        if ~isempty(a4p)
+                            a4p(end) = [];
+                        else
+                            a4p = nan(numel(histcList)-1, 1);
+                        end
+
+                        histMatrixSplit(:,(2*fN)) = a1p(:)/sum(a1p(:)); % Ch1 out 
+                        histMatrixSplit(:,(2*fN)+1) = a2p(:)/sum(a2p(:)); % Ch1 in 
+                        histMatrixSplit(:,(2*fN)+2) = a4p(:)/sum(a4p(:)); % Ch2 out
+                        histMatrixSplit(:,(2*fN)+3) = a3p(:)/sum(a3p(:)); % Ch2 in
+
+                    end
+                    
                     
                     if ExportSeries || MakeGif
                         close(gifWindow);
@@ -1643,10 +1842,12 @@ Startup;
                             if ~isempty(dG) && ~isempty(dR)
                                 bootList_GR = [bootList_GR; dG];
                                 bootList_RG = [bootList_RG; dR];
+ 
                             end
                             
                         end
                         
+                        % Make histograms from random data
                         bootList_GR = bootList_GR * AnalParam.PixelSize * 1000;
                         bootList_RG = bootList_RG * AnalParam.PixelSize * 1000;
                         
@@ -1669,34 +1870,100 @@ Startup;
                         RandomHistMatrix(:,(2*fN)) = aB1(:)/sum(aB1(:));
                         RandomHistMatrix(:,(2*fN)+1) = aB2(:)/sum(aB2(:));
                         
+                        
+                        if handles.handles.SplitCenter.Value()
+                            
+                            % shuffle in and out separately
+                            shuffleLinesIn.G = randperm(sum(postListG(:,4) == 1, 1));
+                            shuffleLinesOut.G = randperm(sum(postListG(:,4) == 0, 1));
+                            
+                            shuffleLinesIn.R = randperm(sum(postListR(:,4) == 1, 1));
+                            shuffleLinesOut.R = randperm(sum(postListR(:,4) == 0, 1));
+                        
+                            inListG = postListG(postListG(:,4) == 1, :);
+                            outListG = postListG(postListG(:,4) == 0, :);
+                            
+                            inListR = postListR(postListR(:,4) == 1, :);
+                            outListR = postListR(postListR(:,4) == 0, :);
+                            
+                            shuffGIn = [inListG(shuffleLinesIn.G, 1:2) inListG(:,3:4)];
+                            shuffGout = [outListG(shuffleLinesOut.G, 1:2) outListG(:,3:4)];
+                            
+                            shuffRIn = [inListR(shuffleLinesIn.R, 1:2) inListR(:,3:4)];
+                            shuffRout = [outListR(shuffleLinesOut.R, 1:2) outListR(:,3:4)];
+
+                            
+                            for k = 1:(handles.N_frames-1)
+                                    % Calc NNdistG and NNdistR for inner and
+                                    % outer regions
+                                    [~, dGIn] = knnsearch(shuffGIn(shuffGIn(:,3)==k, 1:2), ...
+                                        shuffRIn(shuffRIn(:,3)==k, 1:2));
+                                    bootList_GRIn = [bootList_GRIn; dGIn];
+
+                                    [~, dGout] = knnsearch(shuffGout(shuffGout(:,3)==k, 1:2), ...
+                                        shuffRout(shuffRout(:,3)==k, 1:2));
+                                    bootList_GROut = [bootList_GROut; dGout];
+
+                                    [~, dRin] = knnsearch(shuffRIn(shuffRIn(:,3)==k, 1:2), ...
+                                        shuffGIn(shuffGIn(:,3)==k, 1:2));
+                                    bootList_RGIn = [bootList_RGIn; dRin];
+
+                                    [~, dRout] = knnsearch(shuffRout(shuffRout(:,3)==k, 1:2), ...
+                                        shuffGout(shuffGout(:,3)==k, 1:2));
+                                    bootList_RGOut = [bootList_RGOut; dRout];
+
+                            end
+                           
+                            % Make histograms from random split data
+                            bootList_GRIn = bootList_GRIn * AnalParam.PixelSize * 1000;
+                            bootList_GROut = bootList_GROut * AnalParam.PixelSize * 1000;
+                            bootList_RGIn = bootList_RGIn * AnalParam.PixelSize * 1000;
+                            bootList_RGOut = bootList_RGOut * AnalParam.PixelSize * 1000;
+                            
+                            [aB1p, ~] = histc(bootList_GRIn, histcList);
+                            [aB2p, ~] = histc(bootList_GROut, histcList);
+                            [aB3p, ~] = histc(bootList_RGIn, histcList);
+                            [aB4p, ~] = histc(bootList_RGOut, histcList);
+                            
+                            if ~isempty(aB1p)
+                                aB1p(end) = [];
+                                
+                            else
+                                aB1p = nan(numel(histcList)-1, 1);
+                            end
+                            
+                            if ~isempty(aB2p)
+                                aB2p(end) = [];
+                            else
+                                aB2p = nan(numel(histcList)-1, 1);
+                            end
+                            
+                            if ~isempty(aB3p)
+                                aB3p(end) = [];
+                            else
+                                aB3p = nan(numel(histcList)-1, 1);
+                            end
+                            
+                            if ~isempty(aB4p)
+                                aB4p(end) = [];
+                            else
+                                aB4p = nan(numel(histcList)-1, 1);
+                            end
+                            
+                            RandomHistMatrixSplit(:,(2*fN)) = aB2p(:)/sum(aB2p(:)); % Ch1  out 
+                            RandomHistMatrixSplit(:,(2*fN)+1) = aB1p(:)/sum(aB1p(:)); % Ch1 in
+                            RandomHistMatrixSplit(:,(2*fN)+2) = aB4p(:)/sum(aB4p(:)); % Ch2 out
+                            RandomHistMatrixSplit(:,(2*fN)+3) = aB3p(:)/sum(aB3p(:)); % Ch2 in
+                            
+                            
+                        end
+                        
+
+                        
                     end
                     
             
-                % trackResG = track(postListG, 10);
-                % trackResR = track(postListR, 10);
-                NNdistG = NNdistG * AnalParam.PixelSize * 1000;
-                NNdistR = NNdistR * AnalParam.PixelSize * 1000;
 
-                [a1, ~] = histc(NNdistG, histcList);
-                [a2, ~] = histc(NNdistR, histcList);
-
-                % Calc theoretical distribution for cell of size and
-                % particle density as the cells in this run.  
-               
-                if ~isempty(a1)
-                    a1(end) = [];
-                else
-                    a1 = nan(numel(histcList)-1, 1);
-                end
-                
-                if ~isempty(a2)
-                    a2(end) = [];
-                else
-                    a2 = nan(numel(histcList)-1, 1);
-                end
-                
-                histMatrix(:,(2*fN)) = a1(:)/sum(a1(:));
-                histMatrix(:,(2*fN)+1) = a2(:)/sum(a2(:));
                 
 %                 assignin('base', 'histMatrix', histMatrix);
 
@@ -1799,7 +2066,7 @@ Startup;
             if get(handles.handles.ExportHistData, 'Value') == 1
                 
                 legend(histAx, legendString, 'interpreter', 'none');
-                histImgName = fullfile(folderPath, 'SummaryBarPlot_01.png');
+                histImgName = fullfile(folderPath, 'PAVesTOutput_01.png');
                 hINum = 1;
                 while exist(histImgName, 'file')
                     
@@ -1837,11 +2104,32 @@ Startup;
                 fclose(fID);
                 dlmwrite(HistFileName, histMatrix, '-append', 'delimiter', '\t', 'newline', 'pc');
                 
+                if handles.handles.SplitCenter.Value()
                 
+                    %%%%%%%%%%%%%%%
+                    % Print SPLIT DATA histogram to file
+
+                    HistFileName = fullfile(folderPath, strcat(hImg, '_DataSplit.txt'));
+
+                    fID = fopen(HistFileName, 'w+');
+                    fprintf(fID, '#####################\r\n');
+                    fprintf(fID, '# Files analyzed : \r\n');
+
+                    headerString = 'Distance (nm)';
+
+                    for fNms = 1:length(handles.SelectedFiles);
+                        fprintf(fID, '# %.0f.  %s \r\n', fNms, fileNameArray{fNms});
+                        headerString = sprintf('%s\t%.0f--Ch1Out\t%.0f--Ch1In\t%.0f--Ch2Out\t%.0f--Ch2In', headerString, fNms, fNms, fNms, fNms);
+                    end
+                    fprintf(fID, '#####################\r\n');
+                    fprintf(fID, '%s\r\n', headerString);
+
+                    fclose(fID);
+                    dlmwrite(HistFileName, histMatrixSplit, '-append', 'delimiter', '\t', 'newline', 'pc');
+                    
+                end
                 
-                    
-%                     assignin('base', 'InOutParticles', InOutParticles);
-                    
+
                     %%%%%%%%%%%%%%%%%%%%
                     % Center In/Out data
                     legend(InOutAxes, legString, 'interpreter', 'none');
@@ -1914,7 +2202,30 @@ Startup;
 
                         fclose(fID);
                         dlmwrite(HistFileName, RandomHistMatrix, '-append', 'delimiter', '\t', 'newline', 'pc');
+                        
+                        if handles.handles.SplitCenter.Value()
+                            % Print random split data to file
+                            HistFileName = fullfile(folderPath, strcat(hImg, '_RandomPointsSplit.txt'));
+                            
+                            fID = fopen(HistFileName, 'w+');
+                            fprintf(fID, '#####################\r\n');
+                            fprintf(fID, '# Files analyzed : \r\n');
+
+                            headerString = 'Distance (nm)';
+
+                            for fNms = 1:length(handles.SelectedFiles);
+                                fprintf(fID, '# %.0f.  %s \r\n', fNms, fileNameArray{fNms});
+                                headerString = sprintf('%s\t%.0f--Ch1Out\t%.0f--Ch1In\t%.0f--Ch2Out\t%.0f--Ch2In', headerString, fNms, fNms, fNms, fNms);
+                            end
+                            fprintf(fID, '#####################\r\n');
+                            fprintf(fID, '%s\r\n', headerString);
+
+                            fclose(fID);
+                            dlmwrite(HistFileName, RandomHistMatrixSplit, '-append', 'delimiter', '\t', 'newline', 'pc');
+                        end
+                        
                     end
+                    
                 
                 
                     
@@ -1943,7 +2254,7 @@ Startup;
         
         handles = guidata(findobj('Tag', 'TIFF viewer'));
         
-        [fname pathname filterindex] = uigetfile({'*.lsm', 'LSM file (*.lsm)';'*.czi', 'CZI file (*.czi)'});
+        [fname, pathname, filterindex] = uigetfile({'*.lsm', 'LSM file (*.lsm)';'*.czi', 'CZI file (*.czi)'});
         
         if filterindex == 1;
             
@@ -1975,7 +2286,7 @@ Startup;
         text_input = get(handles.handles.Load_text, 'String');
         %disp(text_input)
         
-        if exist(text_input) == 2;
+        if exist(text_input, 'file') == 2;
             
             [pN, fN, extN] = fileparts(text_input);
             
@@ -2211,6 +2522,7 @@ Startup;
             
             displayBkgdThresholdBndry;
             
+            
             if handles.CenterChannel ~= 3
             
                 displayCenterThreshold;
@@ -2319,99 +2631,87 @@ Startup;
 
     function displayCenterThreshold(varargin)
         
-       handles = guidata(findobj('Tag', 'TIFF viewer'));
-       
-       if handles.CenterChannel ~= 3
         
-        delete(findobj('Parent', handles.handles.ax1, 'Type', 'line', 'Color', 'm'));
-        delete(findobj('Parent', handles.handles.ax2, 'Type', 'line', 'Color', 'm'));
+        handles = guidata(findobj('Tag', 'TIFF viewer'));
         
-        set(handles.handles.ax1, 'NextPlot', 'add')
-        set(handles.handles.ax2, 'NextPlot', 'add')
-        
-        frameNum = str2double(get(handles.handles.slide_box, 'String'));
-        ctrVal = handles.CenterIntensity;
-        dilatePixels = handles.FindCtrDilateDiameter;
-        
-%         disp(ctrVal)
-        
-        % Find cell border
-        gT = (handles.Img_stack(:,:,handles.CenterChannel, frameNum) > (ctrVal));
-        regs = regionprops(gT, 'area', 'PixelIdxList');
-        rA = vertcat(regs.Area);
-        regs(rA ~= max(rA)) = [];
-        bwImg = false(size(handles.Img_stack, 1)*size(handles.Img_stack, 2), 1);
-        bwImg(vertcat(regs.PixelIdxList)) = 1;
-        bwImg = reshape(bwImg, size(handles.Img_stack, 1), size(handles.Img_stack, 2));
+        if ismember(handles.CenterChannel, [1, 2])
+            
+            delete(findobj('Parent', handles.handles.ax1, 'Type', 'line', 'Color', 'm'));
+            delete(findobj('Parent', handles.handles.ax2, 'Type', 'line', 'Color', 'm'));
+            
+            set(handles.handles.ax1, 'NextPlot', 'add')
+            set(handles.handles.ax2, 'NextPlot', 'add')
+            
+            frameNum = str2double(get(handles.handles.slide_box, 'String'));
+            ctrVal = handles.CenterIntensity;
+            dilatePixels = handles.FindCtrDilateDiameter;
+            
+            %         disp(ctrVal)
+            
+            % Find cell border
+            gT = (handles.Img_stack(:,:,handles.CenterChannel, frameNum) > (ctrVal));
+            regs = regionprops(gT, 'area', 'PixelIdxList');
+            rA = vertcat(regs.Area);
+            regs(rA ~= max(rA)) = [];
+            bwImg = false(size(handles.Img_stack, 1)*size(handles.Img_stack, 2), 1);
+            bwImg(vertcat(regs.PixelIdxList)) = 1;
+            bwImg = reshape(bwImg, size(handles.Img_stack, 1), size(handles.Img_stack, 2));
+            
+            Bo = bwboundaries(bwImg, 'noholes');
+            
+            bwImg = bwmorph(bwImg, 'dilate', dilatePixels);
+            
+            ctrMask = handles.bwImg;
+            ctrMask(bwImg) = 0;
+            B = bwboundaries(bwImg, 'noholes');
+            
+            for m = 1:length(B)
+                plot(handles.handles.ax1, B{m}(:,2), B{m}(:,1), 'm')
+                plot(handles.handles.ax2, B{m}(:,2), B{m}(:,1), 'm')
+            end
+            
+            for m = 1:length(Bo)
+                plot(handles.handles.ax1, Bo{1}(:,2), Bo{1}(:,1), 'm:')
+                plot(handles.handles.ax2, Bo{1}(:,2), Bo{1}(:,1), 'm:')
+            end
+            
+            set(handles.handles.ax1, 'NextPlot', 'replace')
+            set(handles.handles.ax2, 'NextPlot', 'replace')
+            
+        elseif handles.CenterChannel == 4
+            
+            % Center channel is user-defined
+            
+            frameNum = str2double(get(handles.handles.slide_box, 'String'));
+            
+            % Skip if impoly is already present
+            if isempty(findobj('parent', handles.handles.ax1, 'tag', 'impoly'))
+            
 
-        Bo = bwboundaries(bwImg, 'noholes');
+                % Display user-defined object for that frame
 
-        bwImg = bwmorph(bwImg, 'dilate', dilatePixels);
-
-        ctrMask = handles.bwImg;
-        ctrMask(bwImg) = 0;
-        B = bwboundaries(bwImg, 'noholes');
-        
-        for m = 1:length(B)
-            plot(handles.handles.ax1, B{m}(:,2), B{m}(:,1), 'm')
-            plot(handles.handles.ax2, B{m}(:,2), B{m}(:,1), 'm')
+                currPoly = impoly(handles.handles.ax1, handles.UserDefinedCenterROIs{frameNum});
+                currPoly.setColor('m');
+                currPoly.setClosed(true);
+                currPoly.addNewPositionCallback(@roiPolyUpdate);
+                fcn = makeConstrainToRectFcn('impoly', get(gca,'XLim'), get(gca,'YLim'));
+                currPoly.setPositionConstraintFcn(fcn);
+ 
+            else
+                % skip
+            end
+            
+                delete(findobj('parent', handles.handles.ax2, 'color', 'm'));
+                set(handles.handles.ax2, 'nextplot', 'add');
+                plot(handles.handles.ax2, handles.UserDefinedCenterROIs{frameNum}([1:end 1], 1), ...
+                    handles.UserDefinedCenterROIs{frameNum}([1:end 1], 2), 'm');
+            
         end
-
-        for m = 1:length(Bo)
-            plot(handles.handles.ax1, Bo{1}(:,2), Bo{1}(:,1), 'm:')
-            plot(handles.handles.ax2, Bo{1}(:,2), Bo{1}(:,1), 'm:')
-        end
-        
-        set(handles.handles.ax1, 'NextPlot', 'replace')
-        set(handles.handles.ax2, 'NextPlot', 'replace')
         
         guidata(handles.handles.fig1, handles);
         
-% 
-%         xDg = get(findobj('Parent', handles.handles.ax1, 'type', 'line', 'color', 'r'), 'XData');
-%         yDg = get(findobj('Parent', handles.handles.ax1, 'type', 'line', 'color', 'r'), 'YData');
-%         Dg = [[xDg{1} xDg{2}]; [yDg{1} yDg{2}]]';
-%         Dg = [Dg ones(size(Dg, 1), 1)];
-% 
-%         xDr = get(findobj('Parent', handles.handles.ax2, 'type', 'line', 'color', 'c'), 'XData');
-%         yDr = get(findobj('Parent', handles.handles.ax2, 'type', 'line', 'color', 'c'), 'YData');
-%         Dr = [[xDr{1} xDr{2}]; [yDr{1} yDr{2}]]';
-%         Dr = [Dr ones(size(Dr, 1), 1)];
-%         
-%         % Update drawing of points
-%         delete(findobj('Parent', handles.handles.ax1, 'color', 'r'));
-%         delete(findobj('Parent', handles.handles.ax2, 'color', 'c'));
-%         
-% 
-%         for m = 1:size(Dg, 1)
-%             Dg(m,3) = ctrMask(round(Dg(m,2)), round(Dg(m,1)));
-%         end
-% 
-%         if ~isempty(Dg);
-%             set(handles.handles.ax1, 'NextPlot', 'add');
-%             
-%             plot(handles.handles.ax1, Dg(Dg(:,3) == 1,1), Dg(Dg(:,3) == 1,2), 'cx');
-%             plot(handles.handles.ax1, Dg(Dg(:,3) == 0,1), Dg(Dg(:,3) == 0,2), 'cs', 'markerFaceColor', 'r', 'markerSize', 3);
-%             set(handles.handles.ax1, 'NextPlot', 'replace');
-%         end
-% 
-%         for m = 1:size(Dr, 1)
-%             Dr(m,3) = ctrMask(round(Dr(m,2)), round(Dr(m,1)));
-%         end
-% 
-%         
-%         if ~isempty(Dr);
-%             set(handles.handles.ax2, 'NextPlot', 'add');
-%             
-%             plot(handles.handles.ax2, Dr(Dr(:,3) == 1,1), Dr(Dr(:,3) == 1,2), 'rx');
-%             plot(handles.handles.ax2, Dr(Dr(:,3) == 0,1), Dr(Dr(:,3) == 0,2), 'rs', 'markerFaceColor', 'c', 'markerSize', 3);
-%             set(handles.handles.ax2, 'NextPlot', 'replace');
-%         end
-%         
         
-         calculateDetectedParticles('both');
-        
-       end
+        calculateDetectedParticles('both');
         
     end
 
@@ -2435,17 +2735,30 @@ Startup;
             %         disp(ctrVal)
             
             % Find cell border
-            gT = (handles.Img_stack(:,:,handles.CenterChannel, frameNow) > (ctrVal));
-            regs = regionprops(gT, 'area', 'PixelIdxList');
-            rA = vertcat(regs.Area);
-            regs(rA ~= max(rA)) = [];
-            bwImg = false(size(handles.Img_stack, 1)*size(handles.Img_stack, 2), 1);
-            bwImg(vertcat(regs.PixelIdxList)) = 1;
-            bwImg = reshape(bwImg, size(handles.Img_stack, 1), size(handles.Img_stack, 2));
+            if ismember(handles.CenterChannel, [1 2])
             
-            bwImg = bwmorph(bwImg, 'dilate', dilatePixels);
+                gT = (handles.Img_stack(:,:,handles.CenterChannel, frameNow) > (ctrVal));
+                regs = regionprops(gT, 'area', 'PixelIdxList');
+                rA = vertcat(regs.Area);
+                regs(rA ~= max(rA)) = [];
+                bwImg = false(size(handles.Img_stack, 1)*size(handles.Img_stack, 2), 1);
+                bwImg(vertcat(regs.PixelIdxList)) = 1;
+                bwImg = reshape(bwImg, size(handles.Img_stack, 1), size(handles.Img_stack, 2));
+
+                bwImg = bwmorph(bwImg, 'dilate', dilatePixels);
+
+                ctrMask = handles.bwImg - bwImg;
+
+            elseif handles.CenterChannel == 4
+                
+                ctrMask = ~poly2mask(handles.UserDefinedCenterROIs{frameNow}(:,1), ...
+                    handles.UserDefinedCenterROIs{frameNow}(:,2), ...
+                    size(handles.Img_stack, 1), size(handles.Img_stack, 2));
+                
+                
+            end
             
-            ctrMask = handles.bwImg - bwImg;
+           
         
         end
         
@@ -2453,8 +2766,8 @@ Startup;
             
             
             
-            delete(findobj('Parent', handles.handles.ax1, 'color', 'r', 'marker', 'x'));
-            delete(findobj('Parent', handles.handles.ax1, 'color', 'r', 'marker', 's'));
+            delete(findobj('Parent', handles.handles.ax1, 'color', 'c', 'marker', 'x'));
+            delete(findobj('Parent', handles.handles.ax1, 'color', 'c', 'marker', 's'));
 
             pkG = pkfnd(handles.bPassStack(:,:,1,frameNow), pkfndThresholdG, pkfndRad);
 %             disp('pkfnd 1')
@@ -2491,8 +2804,11 @@ Startup;
             if ~isempty(postListG);
                 set(handles.handles.ax1, 'NextPlot', 'add');
 
-                plot(handles.handles.ax1, handles.ParticleList{1}(handles.ParticleList{1}(:,3) == 1,1), handles.ParticleList{1}(handles.ParticleList{1}(:,3) == 1,2), 'cx');
-                plot(handles.handles.ax1, handles.ParticleList{1}(handles.ParticleList{1}(:,3) == 0,1), handles.ParticleList{1}(handles.ParticleList{1}(:,3) == 0,2), 'cs', 'markerFaceColor', 'c', 'markerSize', 3);
+                xmark = plot(handles.handles.ax1, handles.ParticleList{1}(handles.ParticleList{1}(:,3) == 1,1), handles.ParticleList{1}(handles.ParticleList{1}(:,3) == 1,2), 'cx');
+                dotmark = plot(handles.handles.ax1, handles.ParticleList{1}(handles.ParticleList{1}(:,3) == 0,1), handles.ParticleList{1}(handles.ParticleList{1}(:,3) == 0,2), 'cs', 'markerFaceColor', 'c', 'markerSize', 3);
+                set(xmark, 'hittest', 'off');
+                set(dotmark, 'hittest', 'off');
+            
                 set(handles.handles.ax1, 'NextPlot', 'replace');
             end
             
@@ -2501,8 +2817,8 @@ Startup;
         if strcmp(whichSide, 'right') || strcmp(whichSide, 'both')
             handles = guidata(findobj('Tag', 'TIFF viewer'));
             
-            delete(findobj('Parent', handles.handles.ax2, 'color', 'c', 'marker', 'x'));
-            delete(findobj('Parent', handles.handles.ax2, 'color', 'c', 'marker', 's'));
+            delete(findobj('Parent', handles.handles.ax2, 'color', 'r', 'marker', 'x'));
+            delete(findobj('Parent', handles.handles.ax2, 'color', 'r', 'marker', 's'));
 
             pkfndThresholdR = handles.ParticleIntensityThresholds(2);
             pkfndRad = handles.peakfindRadius;
@@ -2543,8 +2859,10 @@ Startup;
             
             if ~isempty(postListR);
                 set(handles.handles.ax2, 'NextPlot', 'add');
-                plot(handles.handles.ax2, handles.ParticleList{2}(handles.ParticleList{2}(:,3) == 1,1), handles.ParticleList{2}(handles.ParticleList{2}(:,3) == 1,2), 'rx');
-                plot(handles.handles.ax2, handles.ParticleList{2}(handles.ParticleList{2}(:,3) == 0,1), handles.ParticleList{2}(handles.ParticleList{2}(:,3) == 0,2), 'rs', 'markerFaceColor', 'r', 'markerSize', 3);
+                xmark = plot(handles.handles.ax2, handles.ParticleList{2}(handles.ParticleList{2}(:,3) == 1,1), handles.ParticleList{2}(handles.ParticleList{2}(:,3) == 1,2), 'rx');
+                dotmark = plot(handles.handles.ax2, handles.ParticleList{2}(handles.ParticleList{2}(:,3) == 0,1), handles.ParticleList{2}(handles.ParticleList{2}(:,3) == 0,2), 'rs', 'markerFaceColor', 'r', 'markerSize', 3);
+                set(xmark, 'hittest', 'off');
+                set(dotmark, 'hittest', 'off');
                 set(handles.handles.ax2, 'NextPlot', 'replace');
             end
             
@@ -2553,7 +2871,54 @@ Startup;
         guidata(handles.handles.fig1, handles);
         
     end
+    
+%%%%%%%%%%%%%%%%%%%%%%
+% Create user-defined ROIs for all frames
+% Done once when 'U' Channel Center intensity button selected
 
+    function setUpUserDefinedCenterROIs()
+        
+        handles = guidata(findobj('Tag', 'TIFF viewer'));
+        
+        handles.UserDefinedCenterROIs = cell(handles.N_frames, 1);
+        
+        % Start with current frame
+        currPoly = impoly(handles.handles.ax1);
+        currPoly.setColor('m');
+        currPoly.setClosed(true);
+        currPoly.addNewPositionCallback(@roiPolyUpdate);
+        fcn = makeConstrainToRectFcn('impoly', get(gca,'XLim'), get(gca,'YLim'));
+        currPoly.setPositionConstraintFcn(fcn);
+
+        % User now inputs ROI
+
+        % Copy this prototype to every frame in the image
+        for m = 1:handles.N_frames
+            handles.UserDefinedCenterROIs{m} = currPoly.getPosition();
+        end
+    
+        guidata(handles.handles.fig1, handles);
+        
+    end
+
+    function roiPolyUpdate(varargin)
+        
+        handles = guidata(findobj('Tag', 'TIFF viewer'));
+        currFrame = str2double(handles.handles.slide_box.String());        
+         currPoly = iptgetapi(findobj('parent', handles.handles.ax1, 'tag', 'impoly'));
+         handles.UserDefinedCenterROIs{currFrame} = currPoly.getPosition();
+         
+         delete(findobj('parent', handles.handles.ax2, 'color', 'm'));
+         set(handles.handles.ax2, 'nextplot', 'add');
+         plot(handles.handles.ax2, handles.UserDefinedCenterROIs{currFrame}([1:end 1], 1), ...
+             handles.UserDefinedCenterROIs{currFrame}([1:end 1], 2), 'm');
+         
+         guidata(handles.handles.fig1, handles);
+         calculateDetectedParticles('both');
+         
+         
+               
+    end
 
 %%%%%%%%%%%%%%%%%%%%%%
 % Set parameters for image display
