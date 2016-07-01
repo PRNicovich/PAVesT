@@ -1325,15 +1325,26 @@ Startup;
             histMatrix = zeros(numel(histcList)-1, 2*length(handles.SelectedFiles)+1);
             histMatrix(:,1) = histcList(1:(end-1));
             
+            histMatrixSameChannel = histMatrix;
+            
             if handles.handles.SplitCenter.Value()
                 histMatrixSplit = zeros(numel(histcList)-1, 4*length(handles.SelectedFiles)+1);
+                histMatrixSplitSameChannel = zeros(numel(histcList)-1, 4*length(handles.SelectedFiles)+1);
+                
+                histMatrixSplit(:,1) = histcList(1:(end-1));
+                histMatrixSplitSameChannel(:,1) = histcList(1:(end-1));
             end
 
             if IncludeRandomPoints
                 RandomHistMatrix = histMatrix;
+                RandomHistMatrixSameChannel = histMatrix;
                 
                 if handles.handles.SplitCenter.Value()
                     RandomHistMatrixSplit = zeros(numel(histcList)-1, 4*length(handles.SelectedFiles)+1);
+                    RandomHistMatrixSplit(:,1) = histcList(1:(end-1));
+                    
+                    RandomHistMatrixSplitSameChannel = zeros(numel(histcList)-1, 4*length(handles.SelectedFiles)+1);
+                    RandomHistMatrixSplitSameChannel(:,1) = histcList(1:(end-1));
                 end
                 
             end
@@ -1449,7 +1460,7 @@ Startup;
                 % Image series folder
                 if get(handles.handles.ExportImageSeries, 'Value') == 1
                     ExportSeries = true;
-                    ExportSeriesFolder = strcat(folderPath, '\', fileName(1:(end-4)), '_ImageSeries');
+                    ExportSeriesFolder = strcat(folderPath, '\', fileName, '_ImageSeries');
                     if ~exist(ExportSeriesFolder,'dir')
                         mkdir(ExportSeriesFolder)
                     end
@@ -1467,6 +1478,15 @@ Startup;
                 NNdistG = [];
                 NNdistR = [];
                 
+                NNdistGG = [];
+                NNdistRR = [];
+                
+                NNdistGGIn = [];
+                NNdistRRIn = [];
+                
+                NNdistGGOut = [];
+                NNdistRROut = [];
+                
                 NNdistGOut = [];
                 NNdistGIn = [];
                 
@@ -1478,9 +1498,12 @@ Startup;
                 bootList_GROut = [];
                 bootList_RGOut = [];
                 
+                bootList_GGIn = [];
+                bootList_RRIn = [];
+                bootList_GGOut = [];
+                bootList_RROut = [];
+                
                 InOutParticles{fN} = zeros((handles.N_frames-1), 5);
-                
-                
 
                     for k = 1:(handles.N_frames-1)
                         dataHereG = dataGreen(:,:,k);
@@ -1700,6 +1723,12 @@ Startup;
                             [~, dR] = knnsearch(postListR(postListR(:,3)==k, 1:2), postListG(postListG(:,3)==k, 1:2));
                             NNdistR = [NNdistR; dR];
                             
+                            [~, dG] = knnsearch(postListG(postListG(:,3)==k, 1:2), postListG(postListG(:,3)==k, 1:2), 'K', 2);
+                            NNdistGG = [NNdistGG; dG(dG > 0)];
+
+                            [~, dR] = knnsearch(postListR(postListR(:,3)==k, 1:2), postListR(postListR(:,3)==k, 1:2), 'K', 2);
+                            NNdistRR = [NNdistRR; dR(dR > 0)];
+                            
                            
                             if handles.handles.SplitCenter.Value()
                                 % Calc NNdistG and NNdistR for inner and
@@ -1719,6 +1748,24 @@ Startup;
                                 [~, dR] = knnsearch(postListR(postListR(:,3)==k & postListR(:,4) == 0, 1:2), ...
                                     postListG(postListG(:,3)==k & postListG(:,4) == 0, 1:2));
                                 NNdistROut = [NNdistROut; dR];
+                                
+                                %%%% Same-channel
+                                
+                                [~, dG] = knnsearch(postListG(postListG(:,3)==k & postListG(:,4) == 1, 1:2), ...
+                                    postListG(postListG(:,3)==k & postListG(:,4) == 1, 1:2), 'K', 2);
+                                NNdistGGIn = [NNdistGGIn; dG(dG > 0)];
+                            
+                                [~, dG] = knnsearch(postListG(postListG(:,3)==k & postListG(:,4) == 0, 1:2), ...
+                                    postListG(postListG(:,3)==k & postListG(:,4) == 0, 1:2), 'K', 2);
+                                NNdistGGOut = [NNdistGGOut; dG(dG > 0)];
+                                
+                                [~, dR] = knnsearch(postListR(postListR(:,3)==k & postListR(:,4) == 1, 1:2), ...
+                                    postListR(postListR(:,3)==k & postListR(:,4) == 1, 1:2), 'K', 2);
+                                NNdistRRIn = [NNdistRRIn; dR(dR > 0)];
+                            
+                                [~, dR] = knnsearch(postListR(postListR(:,3)==k & postListR(:,4) == 0, 1:2), ...
+                                    postListR(postListR(:,3)==k & postListR(:,4) == 0, 1:2), 'K', 2);
+                                NNdistRROut = [NNdistRROut; dR(dR > 0)];
                                 
                             end
                             
@@ -1768,13 +1815,40 @@ Startup;
                     histMatrix(:,(2*fN)) = a1(:)/sum(a1(:));
                     histMatrix(:,(2*fN)+1) = a2(:)/sum(a2(:));
                     
+                    %%%%%%%%%%%%%%%%
+                    % Same channel
+                    
+                    % trackResG = track(postListG, 10);
+                    % trackResR = track(postListR, 10);
+                    NNdistGG = NNdistGG * AnalParam.PixelSize * 1000;
+                    NNdistRR = NNdistRR * AnalParam.PixelSize * 1000;
+
+                    [a1, ~] = histc(NNdistGG, histcList);
+                    [a2, ~] = histc(NNdistRR, histcList);
+
+
+                    if ~isempty(a1)
+                        a1(end) = [];
+                    else
+                        a1 = nan(numel(histcList)-1, 1);
+                    end
+
+                    if ~isempty(a2)
+                        a2(end) = [];
+                    else
+                        a2 = nan(numel(histcList)-1, 1);
+                    end
+
+                    histMatrixSameChannel(:,(2*fN)) = a1(:)/sum(a1(:));
+                    histMatrixSameChannel(:,(2*fN)+1) = a2(:)/sum(a2(:));
+                    
                     if handles.handles.SplitCenter.Value()
                         
                         NNdistGOut = NNdistGOut * AnalParam.PixelSize * 1000;
                         NNdistGIn = NNdistGIn * AnalParam.PixelSize * 1000;
                         NNdistRIn = NNdistRIn * AnalParam.PixelSize * 1000;
                         NNdistROut = NNdistROut * AnalParam.PixelSize * 1000;
-
+                        
                         [a1p, ~] = histc(NNdistGOut, histcList);
                         [a2p, ~] = histc(NNdistGIn, histcList);
                         [a3p, ~] = histc(NNdistRIn, histcList);
@@ -1803,11 +1877,52 @@ Startup;
                         else
                             a4p = nan(numel(histcList)-1, 1);
                         end
-
-                        histMatrixSplit(:,(2*fN)) = a1p(:)/sum(a1p(:)); % Ch1 out 
-                        histMatrixSplit(:,(2*fN)+1) = a2p(:)/sum(a2p(:)); % Ch1 in 
+                        
+                        histMatrixSplit(:,(2*fN)) = a1p(:)/sum(a1p(:)); % Ch1 out
+                        histMatrixSplit(:,(2*fN)+1) = a2p(:)/sum(a2p(:)); % Ch1 in
                         histMatrixSplit(:,(2*fN)+2) = a4p(:)/sum(a4p(:)); % Ch2 out
                         histMatrixSplit(:,(2*fN)+3) = a3p(:)/sum(a3p(:)); % Ch2 in
+                        
+                        %%%% Same channel
+                        
+                        NNdistGGOut = NNdistGGOut * AnalParam.PixelSize * 1000;
+                        NNdistGGIn = NNdistGGIn * AnalParam.PixelSize * 1000;
+                        NNdistRRIn = NNdistRRIn * AnalParam.PixelSize * 1000;
+                        NNdistRROut = NNdistRROut * AnalParam.PixelSize * 1000;
+                        
+                        [a5p, ~] = histc(NNdistGGOut, histcList);
+                        [a6p, ~] = histc(NNdistGGIn, histcList);
+                        [a7p, ~] = histc(NNdistRRIn, histcList);
+                        [a8p, ~] = histc(NNdistRROut, histcList);
+                        
+                        if ~isempty(a5p)
+                            a5p(end) = [];
+                        else
+                            a5p = nan(numel(histcList)-1, 1);
+                        end
+                        
+                        if ~isempty(a6p)
+                            a6p(end) = [];
+                        else
+                            a6p = nan(numel(histcList)-1, 1);
+                        end
+                        
+                        if ~isempty(a7p)
+                            a7p(end) = [];
+                        else
+                            a7p = nan(numel(histcList)-1, 1);
+                        end
+                        
+                        if ~isempty(a8p)
+                            a8p(end) = [];
+                        else
+                            a8p = nan(numel(histcList)-1, 1);
+                        end
+                        
+                        histMatrixSplitSameChannel(:,(2*fN)) = a5p(:)/sum(a5p(:)); % Ch1 out
+                        histMatrixSplitSameChannel(:,(2*fN)+1) = a6p(:)/sum(a6p(:)); % Ch1 in
+                        histMatrixSplitSameChannel(:,(2*fN)+2) = a8p(:)/sum(a8p(:)); % Ch2 out
+                        histMatrixSplitSameChannel(:,(2*fN)+3) = a7p(:)/sum(a7p(:)); % Ch2 in
 
                     end
                     
@@ -1827,6 +1942,9 @@ Startup;
                         bootList_GR = [];
                         bootList_RG = [];
                         
+                        bootList_GG = [];
+                        bootList_RR = [];
+                        
                         shuffleLines.G = randperm(size(postListG, 1));
                         shuffleLines.R = randperm(size(postListR, 1));
                         
@@ -1839,9 +1957,15 @@ Startup;
                             [~, dR] = knnsearch(shuffR(shuffR(:,3)==k, 1:2), shuffG(shuffG(:,3)==k, 1:2));
                             
                             
+                            [~, dGG] = knnsearch(shuffG(shuffG(:,3)==k, 1:2), shuffG(shuffG(:,3)==k, 1:2), 'K', 2);
+                            [~, dRR] = knnsearch(shuffR(shuffR(:,3)==k, 1:2), shuffR(shuffR(:,3)==k, 1:2), 'K', 2);
+                            
                             if ~isempty(dG) && ~isempty(dR)
                                 bootList_GR = [bootList_GR; dG];
                                 bootList_RG = [bootList_RG; dR];
+                                
+                                bootList_GG = [bootList_GG; dGG(dGG > 0)];
+                                bootList_RR = [bootList_RR; dRR(dRR > 0)];
  
                             end
                             
@@ -1869,6 +1993,31 @@ Startup;
                         
                         RandomHistMatrix(:,(2*fN)) = aB1(:)/sum(aB1(:));
                         RandomHistMatrix(:,(2*fN)+1) = aB2(:)/sum(aB2(:));
+                        
+                        %%%%%%%%
+                        % Same channel
+                        % Make histograms from random data
+                        bootList_GG = bootList_GG * AnalParam.PixelSize * 1000;
+                        bootList_RR = bootList_RR * AnalParam.PixelSize * 1000;
+                        
+                        [aB1sc, ~] = histc(bootList_GG, histcList);
+                        [aB2sc, ~] = histc(bootList_RR, histcList);
+                        
+                        if ~isempty(aB1sc)
+                            aB1sc(end) = [];
+                            
+                        else
+                            aB1sc = nan(numel(histcList)-1, 1);
+                        end
+                        
+                        if ~isempty(aB2sc)
+                            aB2sc(end) = [];
+                        else
+                            aB2sc = nan(numel(histcList)-1, 1);
+                        end
+                        
+                        RandomHistMatrixSameChannel(:,(2*fN)) = aB1sc(:)/sum(aB1sc(:));
+                        RandomHistMatrixSameChannel(:,(2*fN)+1) = aB2sc(:)/sum(aB2sc(:));
                         
                         
                         if handles.handles.SplitCenter.Value()
@@ -1911,6 +2060,25 @@ Startup;
                                     [~, dRout] = knnsearch(shuffRout(shuffRout(:,3)==k, 1:2), ...
                                         shuffGout(shuffGout(:,3)==k, 1:2));
                                     bootList_RGOut = [bootList_RGOut; dRout];
+                                    
+                                    %%%%%%%%%%%%
+                                    % Same channel
+                                    
+                                    [~, dGIn] = knnsearch(shuffGIn(shuffGIn(:,3)==k, 1:2), ...
+                                        shuffGIn(shuffGIn(:,3)==k, 1:2), 'K', 2);
+                                    bootList_GGIn = [bootList_GGIn; dGIn(dGIn > 0)];
+
+                                    [~, dGout] = knnsearch(shuffGout(shuffGout(:,3)==k, 1:2), ...
+                                        shuffGout(shuffGout(:,3)==k, 1:2), 'K', 2);
+                                    bootList_GGOut = [bootList_GGOut; dGout(dGout > 0)];
+
+                                    [~, dRin] = knnsearch(shuffRIn(shuffRIn(:,3)==k, 1:2), ...
+                                        shuffRIn(shuffRIn(:,3)==k, 1:2), 'K', 2);
+                                    bootList_RRIn = [bootList_RRIn; dRin(dRin > 0)];
+
+                                    [~, dRout] = knnsearch(shuffRout(shuffRout(:,3)==k, 1:2), ...
+                                        shuffRout(shuffRout(:,3)==k, 1:2), 'K', 2);
+                                    bootList_RROut = [bootList_RROut; dRout(dRout > 0)];
 
                             end
                            
@@ -1956,6 +2124,49 @@ Startup;
                             RandomHistMatrixSplit(:,(2*fN)+3) = aB3p(:)/sum(aB3p(:)); % Ch2 in
                             
                             
+                            %%%%%%%%%%%%%%%%%%%%%
+                            % Same channel
+                            % Make histograms from random split data
+                            bootList_GGIn = bootList_GGIn * AnalParam.PixelSize * 1000;
+                            bootList_GGOut = bootList_GGOut * AnalParam.PixelSize * 1000;
+                            bootList_RRIn = bootList_RRIn * AnalParam.PixelSize * 1000;
+                            bootList_RROut = bootList_RROut * AnalParam.PixelSize * 1000;
+                            
+                            [aB5p, ~] = histc(bootList_GGIn, histcList);
+                            [aB6p, ~] = histc(bootList_GGOut, histcList);
+                            [aB7p, ~] = histc(bootList_RRIn, histcList);
+                            [aB8p, ~] = histc(bootList_RROut, histcList);
+                            
+                            if ~isempty(aB5p)
+                                aB5p(end) = [];
+                                
+                            else
+                                aB5p = nan(numel(histcList)-1, 1);
+                            end
+                            
+                            if ~isempty(aB6p)
+                                aB6p(end) = [];
+                            else
+                                aB6p = nan(numel(histcList)-1, 1);
+                            end
+                            
+                            if ~isempty(aB7p)
+                                aB7p(end) = [];
+                            else
+                                aB7p = nan(numel(histcList)-1, 1);
+                            end
+                            
+                            if ~isempty(aB8p)
+                                aB8p(end) = [];
+                            else
+                                aB8p = nan(numel(histcList)-1, 1);
+                            end
+                            
+                            RandomHistMatrixSplitSameChannel(:,(2*fN)) = aB6p(:)/sum(aB6p(:)); % Ch1  out 
+                            RandomHistMatrixSplitSameChannel(:,(2*fN)+1) = aB5p(:)/sum(aB5p(:)); % Ch1 in
+                            RandomHistMatrixSplitSameChannel(:,(2*fN)+2) = aB8p(:)/sum(aB8p(:)); % Ch2 out
+                            RandomHistMatrixSplitSameChannel(:,(2*fN)+3) = aB7p(:)/sum(aB7p(:)); % Ch2 in
+                            
                         end
                         
 
@@ -1969,11 +2180,11 @@ Startup;
 
                 if get(handles.handles.ExportHistData, 'Value') == 1
                     
-                    plot(histAx, histcList(1:(end-1)), a1/sum(a1(:)), 'LineStyle', '-', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
+                    plot(histAx, histcList(1:(end-1)), histMatrix(:,2+(2*(fN-1))), 'LineStyle', '-', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
                     if fN == 1
                         set(histAx, 'NextPlot', 'add')
                     end
-                    plot(histAx, histcList(1:(end-1)), a2/sum(a2(:)), 'LineStyle', '--', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
+                    plot(histAx, histcList(1:(end-1)), histMatrix(:,3+(2*(fN-1))), 'LineStyle', '--', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
 
                     xlabel(histAx, 'Cross-channel Nearest-neighbor Distance (nm)', 'FontSize', 12);
                     ylabel(histAx, 'PDF', 'FontSize', 12)
@@ -1981,8 +2192,8 @@ Startup;
                     set(histAx, 'LooseInset', get(histAx, 'TightInset'));
                     
                     if IncludeRandomPoints && ~(isempty(aB1) && isempty(aB2))
-                        plot(histAx, histcList(1:(end-1)), aB1(:)/sum(aB1(:)), 'LineStyle', ':', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
-                        plot(histAx, histcList(1:(end-1)), aB2(:)/sum(aB2(:)), 'LineStyle', '-.', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
+                        plot(histAx, histcList(1:(end-1)), RandomHistMatrix(:,2+(2*(fN-1))), 'LineStyle', ':', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
+                        plot(histAx, histcList(1:(end-1)), RandomHistMatrix(:,3+(2*(fN-1))), 'LineStyle', '-.', 'Color', handles.ColorList(fN,:), 'LineWidth', 2);
                         
                         legendString{4*(fN-1)+1} = strcat(fileName, ' 2 -> 1');
                         legendString{4*(fN-1)+2} = strcat(fileName, ' 1 -> 2');
@@ -2066,7 +2277,7 @@ Startup;
             if get(handles.handles.ExportHistData, 'Value') == 1
                 
                 legend(histAx, legendString, 'interpreter', 'none');
-                histImgName = fullfile(folderPath, 'PAVesTOutput_01.png');
+                histImgName = strcat(folderPath, '\', fileName, '.png');
                 hINum = 1;
                 while exist(histImgName, 'file')
                     
@@ -2077,8 +2288,8 @@ Startup;
                     
                 end
                     
-
-                print(histogramFigure, '-dpng', histImgName);
+                
+                print(histogramFigure, '-dpng', strcat(histImgName(1:(end-4)), '_XChanNNDist.png'));
                 
                 [~, hImg] = fileparts(histImgName);
 
@@ -2086,47 +2297,50 @@ Startup;
                 %%%%%%%%%%%%%%%
                 % Print histogram data file
                 
-                HistFileName = fullfile(folderPath, strcat(hImg, '_Data.txt'));
+                HistFileName = fullfile(folderPath, strcat(hImg, '_XChanNNDist.txt'));
+                WriteHistogramsToFile(histMatrix, HistFileName, fileNameArray, 2);
                 
-                fID = fopen(HistFileName, 'w+');
-                fprintf(fID, '#####################\r\n');
-                fprintf(fID, '# Files analyzed : \r\n');
-                
-                headerString = 'Distance (nm)';
-                
-                for fNms = 1:length(handles.SelectedFiles);
-                    fprintf(fID, '# %.0f.  %s \r\n', fNms, fileNameArray{fNms});
-                    headerString = sprintf('%s\t%.0f--Ch1\t%.0f--Ch2', headerString, fNms, fNms);
-                end
-                fprintf(fID, '#####################\r\n');
-                fprintf(fID, '%s\r\n', headerString);
-                
-                fclose(fID);
-                dlmwrite(HistFileName, histMatrix, '-append', 'delimiter', '\t', 'newline', 'pc');
+                HistFileName = fullfile(folderPath, strcat(hImg, '_SameChanNNDist.txt'));
+                WriteHistogramsToFile(histMatrixSameChannel, HistFileName, fileNameArray, 2);
                 
                 if handles.handles.SplitCenter.Value()
                 
                     %%%%%%%%%%%%%%%
                     % Print SPLIT DATA histogram to file
 
-                    HistFileName = fullfile(folderPath, strcat(hImg, '_DataSplit.txt'));
-
-                    fID = fopen(HistFileName, 'w+');
-                    fprintf(fID, '#####################\r\n');
-                    fprintf(fID, '# Files analyzed : \r\n');
-
-                    headerString = 'Distance (nm)';
-
-                    for fNms = 1:length(handles.SelectedFiles);
-                        fprintf(fID, '# %.0f.  %s \r\n', fNms, fileNameArray{fNms});
-                        headerString = sprintf('%s\t%.0f--Ch1Out\t%.0f--Ch1In\t%.0f--Ch2Out\t%.0f--Ch2In', headerString, fNms, fNms, fNms, fNms);
-                    end
-                    fprintf(fID, '#####################\r\n');
-                    fprintf(fID, '%s\r\n', headerString);
-
-                    fclose(fID);
-                    dlmwrite(HistFileName, histMatrixSplit, '-append', 'delimiter', '\t', 'newline', 'pc');
+                    HistFileName = fullfile(folderPath, strcat(hImg, '_XChanNNDistSplit.txt'));
+                    WriteHistogramsToFile(histMatrixSplit, HistFileName, fileNameArray, 4);
                     
+                    HistFileName = fullfile(folderPath, strcat(hImg, '_SameChanNNDistSplit.txt'));
+                    WriteHistogramsToFile(histMatrixSplitSameChannel, HistFileName, fileNameArray, 4);
+                    
+                    
+                    
+                end
+                
+                if IncludeRandomPoints
+                        %%%%%%%%%%%%%%%%%
+                        % Include random data
+                        %%%%%%%%%%%%%%%
+                        % Print histogram data file
+
+                        HistFileName = fullfile(folderPath, strcat(hImg, '_XChanNNDistRandomized.txt'));
+                        WriteHistogramsToFile(RandomHistMatrix, HistFileName, fileNameArray, 2);
+                        
+                        HistFileName = fullfile(folderPath, strcat(hImg, '_SameChanNNDistRandomized.txt'));
+                        WriteHistogramsToFile(RandomHistMatrixSameChannel, HistFileName, fileNameArray, 2);
+                        
+                        
+                        if handles.handles.SplitCenter.Value()
+                            % Print random split data to file
+                            HistFileName = fullfile(folderPath, strcat(hImg, '_XChanNNDistRandomizedSplit.txt'));
+                            WriteHistogramsToFile(RandomHistMatrixSplit, HistFileName, fileNameArray, 2);
+                            
+                            HistFileName = fullfile(folderPath, strcat(hImg, '_SameChanNNDistRandomizedSplit.txt'));
+                            WriteHistogramsToFile(RandomHistMatrixSplitSameChannel, HistFileName, fileNameArray, 2);
+                            
+                        end
+                        
                 end
                 
 
@@ -2136,8 +2350,9 @@ Startup;
 
                     %%%%%%%%%%%%%%%
                     % Print histogram data file
+                    % Count of points in and out of center region
 
-                    InOutFileName = fullfile(folderPath, strcat(hImg, '_InOutData.txt'));
+                    InOutFileName = fullfile(folderPath, strcat(hImg, '_CountInOut.txt'));
 
                     fID = fopen(InOutFileName, 'w+');
 
@@ -2178,59 +2393,8 @@ Startup;
                     end
                     fclose(fID);
                     
-                    
-                    if IncludeRandomPoints
-                        %%%%%%%%%%%%%%%%%
-                        % Include random data
-                        %%%%%%%%%%%%%%%
-                        % Print histogram data file
 
-                        HistFileName = fullfile(folderPath, strcat(hImg, '_RandomPoints.txt'));
-
-                        fID = fopen(HistFileName, 'w+');
-                        fprintf(fID, '#####################\r\n');
-                        fprintf(fID, '# Files analyzed : \r\n');
-
-                        headerString = 'Distance (nm)';
-
-                        for fNms = 1:length(handles.SelectedFiles);
-                            fprintf(fID, '# %.0f.  %s \r\n', fNms, fileNameArray{fNms});
-                            headerString = sprintf('%s\t%.0f--Ch1\t%.0f--Ch2', headerString, fNms, fNms);
-                        end
-                        fprintf(fID, '#####################\r\n');
-                        fprintf(fID, '%s\r\n', headerString);
-
-                        fclose(fID);
-                        dlmwrite(HistFileName, RandomHistMatrix, '-append', 'delimiter', '\t', 'newline', 'pc');
-                        
-                        if handles.handles.SplitCenter.Value()
-                            % Print random split data to file
-                            HistFileName = fullfile(folderPath, strcat(hImg, '_RandomPointsSplit.txt'));
-                            
-                            fID = fopen(HistFileName, 'w+');
-                            fprintf(fID, '#####################\r\n');
-                            fprintf(fID, '# Files analyzed : \r\n');
-
-                            headerString = 'Distance (nm)';
-
-                            for fNms = 1:length(handles.SelectedFiles);
-                                fprintf(fID, '# %.0f.  %s \r\n', fNms, fileNameArray{fNms});
-                                headerString = sprintf('%s\t%.0f--Ch1Out\t%.0f--Ch1In\t%.0f--Ch2Out\t%.0f--Ch2In', headerString, fNms, fNms, fNms, fNms);
-                            end
-                            fprintf(fID, '#####################\r\n');
-                            fprintf(fID, '%s\r\n', headerString);
-
-                            fclose(fID);
-                            dlmwrite(HistFileName, RandomHistMatrixSplit, '-append', 'delimiter', '\t', 'newline', 'pc');
-                        end
-                        
-                    end
-                    
-                
-                
-                    
-                    
-                    print(InOutFigure, '-dpng', strcat(hImg, '_InOutImg', '.png'));
+                    print(InOutFigure, '-dpng', strcat(hImg, '_CountInOut', '.png'));
 
               
 
@@ -2239,6 +2403,33 @@ Startup;
             set(handles.handles.fig3, 'Pointer', 'arrow');
             set(findobj('Parent', handles.handles.fig3, 'type', 'uicontrol'), 'enable', 'on');
             drawnow;
+        end
+        
+        function WriteHistogramsToFile(histMatrixwrite, fileNameWrite, fNarray, NColsPerSet)
+            
+            % Handler function for writing histogram data to TXT file
+            
+            fID = fopen(fileNameWrite, 'w+');
+            fprintf(fID, '#####################\r\n');
+            fprintf(fID, '# Files analyzed : \r\n');
+            
+            headerString = 'Distance (nm)';
+            
+            for fNms = 1:length(fNarray);
+                fprintf(fID, '# %.0f.  %s \r\n', fNms, fNarray{fNms});
+                
+                if NColsPerSet == 2
+                    headerString = sprintf('%s\t%.0f--Ch1\t%.0f--Ch2', headerString, fNms, fNms);
+                elseif NColsPerSet == 4
+                    headerString = sprintf('%s\t%.0f--Ch1Out\t%.0f--Ch1In\t%.0f--Ch2Out\t%.0f--Ch2In', headerString, fNms, fNms, fNms, fNms);
+                end
+            end
+            fprintf(fID, '#####################\r\n');
+            fprintf(fID, '%s\r\n', headerString);
+            
+            fclose(fID);
+            dlmwrite(fileNameWrite, histMatrixwrite, '-append', 'delimiter', '\t', 'newline', 'pc');
+            
         end
 
                    
