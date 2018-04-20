@@ -2789,7 +2789,9 @@ Startup;
         rA = vertcat(regs.Area);
         regs(rA ~= max(rA)) = [];
         bwImg = zeros(size(handles.Img_stack, 1), size(handles.Img_stack, 2), 1);
-        bwImg(regs.PixelIdxList) = 1;
+        if ~isempty(regs)
+            bwImg(regs.PixelIdxList) = 1;
+        end
         bwImg = reshape(bwImg, size(handles.Img_stack, 1), size(handles.Img_stack, 2));
 
         Bo = bwboundaries(bwImg, 'noholes');
